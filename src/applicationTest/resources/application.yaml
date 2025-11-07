@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: redisson-streams-testapp
+  main:
+    banner-mode: "off"
+  data:
+    redis:
+      database: 7
+      timeout: 5s
+
+testapp:
+  streams:
+    orders: orders
+    notifications: notifications
+    orders-group: orders-group
