@@ -61,16 +61,7 @@ class RedisStreamHandlerRegistrar(
      */
     @Throws(BeansException::class)
     override fun postProcessAfterInitialization(bean: Any, beanName: String): Any {
-        // 1) Берём таргет-класс, чтобы не упереться в AOP-прокси
         val targetClass = AopUtils.getTargetClass(bean)
-
-        // 2) Фильтруем по пакету — сюда подойдут любые твои корневые пакеты
-        val pkg = targetClass.packageName
-        if (!pkg.startsWith("art.picsell")) {
-            return bean
-        }
-
-        // 3) Только теперь лезем в Kotlin-рефлексию
         val kClass = targetClass.kotlin
 
         kClass.declaredMemberFunctions.forEach { fn ->
@@ -145,7 +136,7 @@ class RedisStreamHandlerRegistrar(
             }
 
             val listener =
-                StreamListener<String, MapRecord<String, String, String>> { msg: MapRecord<String, String, String> ->
+                StreamListener { msg: MapRecord<String, String, String> ->
                     scope.launch {
                         try {
                             val className = msg.value[CLASS_FIELD] ?: return@launch
