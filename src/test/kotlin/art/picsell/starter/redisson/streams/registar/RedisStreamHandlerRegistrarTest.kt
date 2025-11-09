@@ -54,7 +54,10 @@ class RedisStreamHandlerRegistrarTest {
         registrar.afterSingletonsInstantiated()
 
         val payload = mapper.writeValueAsString(TestEvent("42"))
-        val record = MapRecord.create("orders", mapOf("type" to "TestEvent", "payload" to payload))
+        val record = MapRecord.create(
+            "orders",
+            mapOf("_class" to TestEvent::class.qualifiedName!!, "payload" to payload)
+        )
 
         listener.onMessage(record)
 

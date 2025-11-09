@@ -80,7 +80,7 @@ class RedisStreamHandlerRegistrar(
                 ?: error("Handler ${fn.name} in ${kClass.simpleName} must have exactly one argument")
 
             val paramClass = param.type.jvmErasure.java
-            val typeName = ann.type.ifEmpty { param.type.jvmErasure.simpleName ?: fn.name }
+            val typeName = ann.type.ifEmpty { param.type.jvmErasure.qualifiedName ?: fn.name }
 
             if (ann.mode == DeliveryMode.EXCLUSIVE && ann.group.isBlank()) {
                 error("Handler ${fn.name} in ${kClass.simpleName} must define a non-blank group for EXCLUSIVE mode")
@@ -148,8 +148,8 @@ class RedisStreamHandlerRegistrar(
                 StreamListener<String, MapRecord<String, String, String>> { msg: MapRecord<String, String, String> ->
                     scope.launch {
                         try {
-                            val type = msg.value[TYPE_FIELD] ?: return@launch
-                            if (type != handler.typeName) return@launch
+                            val className = msg.value[CLASS_FIELD] ?: return@launch
+                            if (className != handler.typeName) return@launch
 
                             val payload = msg.value[PAYLOAD_FIELD] ?: return@launch
                             @Suppress("UNCHECKED_CAST")
@@ -195,7 +195,7 @@ class RedisStreamHandlerRegistrar(
     }
 
     companion object : KLogging() {
-        private const val TYPE_FIELD = "type"
+        private const val CLASS_FIELD = "_class"
         private const val PAYLOAD_FIELD = "payload"
     }
 }

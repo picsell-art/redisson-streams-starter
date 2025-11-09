@@ -154,14 +154,14 @@ class RedisStreamsStarterApplicationTest @Autowired constructor(
         streamName: String,
         expected: T,
         eventClass: Class<T>,
-        expectedType: String = eventClass.simpleName
+        expectedType: String = eventClass.name
     ): Boolean {
         val typeToMatch = expectedType
         val entries = stream(streamName).range(StreamMessageId.MIN, StreamMessageId.MAX).values
         if (entries.isEmpty()) return false
 
         return entries.any { entry ->
-            val typeMatches = entry[TYPE_FIELD] == typeToMatch
+            val typeMatches = entry[CLASS_FIELD] == typeToMatch
             val payloadMatches = entry[PAYLOAD_FIELD]
                 ?.let { runCatching { mapper.readValue(it, eventClass) }.getOrNull() }
                 ?.equals(expected) == true
@@ -170,19 +170,19 @@ class RedisStreamsStarterApplicationTest @Autowired constructor(
     }
 
     private fun <T : Any> appendRawEvent(streamName: String, event: T) {
-        val type = requireNotNull(event::class.simpleName) {
+        val type = requireNotNull(event::class.qualifiedName) {
             "Cannot derive payload type for ${event::class}"
         }
         val payload = mapper.writeValueAsString(event)
         stream(streamName).add(
             StreamAddArgs.entries(
-                mapOf(TYPE_FIELD to type, PAYLOAD_FIELD to payload)
+                mapOf(CLASS_FIELD to type, PAYLOAD_FIELD to payload)
             )
         )
     }
 
     companion object {
-        private const val TYPE_FIELD = "type"
+        private const val CLASS_FIELD = "_class"
         private const val PAYLOAD_FIELD = "payload"
 
         @Container

@@ -8,7 +8,7 @@ package art.picsell.starter.redisson.streams.annotation
  *
  * @property stream Redis Stream key that will receive produced events.
  * @property async When `true`, events are appended via Redisson's async API.
- * @property type Optional logical event type. Defaults to the payload class simple name.
+ * @property type Optional logical event type. Defaults to the payload class fully qualified name.
  */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)

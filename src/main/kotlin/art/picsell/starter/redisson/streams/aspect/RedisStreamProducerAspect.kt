@@ -44,14 +44,14 @@ class RedisStreamProducerAspect(
         )
 
         val payload = mapper.writeValueAsString(event)
-        val type = ann.type.ifBlank { event::class.java.simpleName }
+        val className = ann.type.ifBlank { event::class.java.name }
         val stream = redisson.getStream<String, String>(ann.stream, StringCodec.INSTANCE)
         val result = joinPoint.proceed()
 
-        val streamArgs = StreamAddArgs.entries(mapOf(TYPE_FIELD to type, PAYLOAD_FIELD to payload))
+        val streamArgs = StreamAddArgs.entries(mapOf(CLASS_FIELD to className, PAYLOAD_FIELD to payload))
 
         try {
-            logger.debug { "Publishing Redis stream message to '${ann.stream}' type=$type async=${ann.async}" }
+            logger.debug { "Publishing Redis stream message to '${ann.stream}' class=$className async=${ann.async}" }
             if (ann.async) {
                 stream.addAsync(streamArgs)
             } else {
@@ -68,7 +68,7 @@ class RedisStreamProducerAspect(
     }
 
     companion object : KLogging() {
-        private const val TYPE_FIELD = "type"
+        private const val CLASS_FIELD = "_class"
         private const val PAYLOAD_FIELD = "payload"
     }
 }
