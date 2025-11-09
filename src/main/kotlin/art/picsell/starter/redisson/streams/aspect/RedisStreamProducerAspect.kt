@@ -2,7 +2,7 @@ package art.picsell.starter.redisson.streams.aspect
 
 import art.picsell.starter.redisson.streams.annotation.RedisStreamProducer
 import com.fasterxml.jackson.databind.ObjectMapper
-import mu.KLogging
+import mu.two.KLogging
 import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.Around
 import org.aspectj.lang.annotation.Aspect

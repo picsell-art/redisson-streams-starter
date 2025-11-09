@@ -3,6 +3,7 @@ import java.util.Base64
 plugins {
     kotlin("jvm") version "1.9.25"
     kotlin("plugin.spring") version "1.9.25"
+    id("java-library")
 
     id("io.spring.dependency-management") version "1.1.7"
     id("org.springframework.boot") version "3.5.7" apply false
@@ -11,13 +12,15 @@ plugins {
     id("signing")
 }
 
-val starterVersion = "0.0.1"
+val starterVersion = "0.0.2"
 val artifact = "redisson-streams-starter"
 val starterGroup = "art.picsell.starter"
+
 group = starterGroup
 version = starterVersion
 description = "Spring Boot starter for redisson streams producers and consumers in Kafka-like way"
 
+// --- Java / Kotlin setup ---
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -37,7 +40,7 @@ tasks.withType<JavaCompile>().configureEach {
     options.release.set(17)
 }
 
-
+// --- Custom source set for application tests ---
 sourceSets {
     val main by getting
     val test by getting
@@ -58,6 +61,7 @@ configurations {
     }
 }
 
+// --- Dependency Management ---
 dependencyManagement {
     imports {
         mavenBom("org.springframework.boot:spring-boot-dependencies:3.2.0")
@@ -68,30 +72,37 @@ repositories {
     mavenCentral()
 }
 
+// --- Dependencies ---
 dependencies {
+    // Spring Boot core
     compileOnly("org.springframework.boot:spring-boot")
     compileOnly("org.springframework.boot:spring-boot-autoconfigure")
 
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-    implementation("org.redisson:redisson:3.37.0")
+    // Runtime dependencies that must propagate to consumer project
+    api("com.fasterxml.jackson.module:jackson-module-kotlin")
+    api("org.jetbrains.kotlin:kotlin-reflect")
+    api("io.github.microutils:kotlin-logging:4.0.0-beta-2")
+    api("org.slf4j:slf4j-api:2.0.13")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    api("org.redisson:redisson:3.37.0")
+    api("org.springframework.boot:spring-boot-starter-data-redis")
+    api("org.springframework.boot:spring-boot-starter-aop")
 
-    implementation("org.springframework.boot:spring-boot-starter-data-redis")
-    implementation("org.springframework.boot:spring-boot-starter-aop")
-
+    // Optional / compile-time only dependencies
     compileOnly("org.springframework.boot:spring-boot-starter-webflux")
     compileOnly("org.springframework.boot:spring-boot-starter-validation")
 
+    // Annotation processor for configuration properties
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
+    // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testImplementation("io.mockk:mockk:1.13.13")
     testImplementation("org.testcontainers:junit-jupiter:1.19.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
+    // Application test source set
     add("applicationTestImplementation", "org.wiremock:wiremock-standalone:3.9.1")
     add("applicationTestImplementation", "org.springframework.boot:spring-boot-starter-webflux")
 }
@@ -114,6 +125,7 @@ tasks.named("check") {
     dependsOn("applicationTest")
 }
 
+// --- Signing setup ---
 signing {
     useInMemoryPgpKeys(
         findProperty("signing.keyId") as String?,
@@ -123,6 +135,7 @@ signing {
     sign(publishing.publications)
 }
 
+// --- Publishing setup ---
 publishing {
     publications {
         create<MavenPublication>("github") {
@@ -160,11 +173,9 @@ publishing {
     }
 
     repositories {
-        // GitHub Packages
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/picsell-art/redisson-streams-starter")
-
             credentials {
                 username = findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
                 password = findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
@@ -173,9 +184,9 @@ publishing {
     }
 }
 
+// --- Maven Central (via Vanniktech plugin) ---
 mavenPublishing {
     coordinates(starterGroup, artifact, starterVersion)
-
     publishToMavenCentral(true)
     signAllPublications()
 
@@ -204,16 +215,16 @@ mavenPublishing {
     }
 }
 
-setDependants("signMavenPublication", "publishGithubPublicationToMavenCentralRepository")
-setDependants("plainJavadocJar", "generateMetadataFileFor")
-setDependants("publishMavenPublicationToMavenCentralRepository", "signGithubPublication")
-
-
+// --- Helper to enforce signing dependency ordering ---
 fun setDependants(parent: String, child: String) {
     afterEvaluate {
-        val signMavenPublication by tasks.named(parent)
+        val parentTask = tasks.named(parent)
         tasks.matching { it.name.startsWith(child) }.configureEach {
-            dependsOn(signMavenPublication)
+            dependsOn(parentTask)
         }
     }
 }
+
+setDependants("signMavenPublication", "publish")
+setDependants("signGithubPublication", "publish")
+setDependants("plainJavadocJar", "generateMetadataFileFor")

@@ -5,7 +5,7 @@ import art.picsell.starter.redisson.streams.model.enum.DeliveryMode
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import mu.KLogging
+import mu.two.KLogging
 import org.springframework.aop.support.AopUtils
 import org.springframework.beans.BeansException
 import org.springframework.beans.factory.SmartInitializingSingleton
