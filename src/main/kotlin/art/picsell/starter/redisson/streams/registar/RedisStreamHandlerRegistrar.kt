@@ -8,9 +8,12 @@ import kotlinx.coroutines.launch
 import mu.two.KLogging
 import org.springframework.aop.support.AopUtils
 import org.springframework.beans.BeansException
+import org.springframework.beans.factory.BeanFactory
+import org.springframework.beans.factory.BeanFactoryAware
 import org.springframework.beans.factory.SmartInitializingSingleton
 import org.springframework.beans.factory.config.BeanDefinition
 import org.springframework.beans.factory.config.BeanPostProcessor
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory
 import org.springframework.context.annotation.Role
 import org.springframework.dao.DataAccessException
 import org.springframework.data.redis.RedisSystemException
@@ -41,7 +44,7 @@ class RedisStreamHandlerRegistrar(
     private val mapper: ObjectMapper,
     private val scope: CoroutineScope,
     private val connectionFactory: RedisConnectionFactory,
-) : BeanPostProcessor, SmartInitializingSingleton {
+) : BeanPostProcessor, SmartInitializingSingleton, BeanFactoryAware {
 
     /**
      * Captures resolved handler metadata used during container registration.
@@ -55,16 +58,37 @@ class RedisStreamHandlerRegistrar(
     )
 
     private val handlers = mutableListOf<HandlerDef>()
+    private var beanFactory: ConfigurableListableBeanFactory? = null
+
+    override fun setBeanFactory(beanFactory: BeanFactory) {
+        this.beanFactory = beanFactory as? ConfigurableListableBeanFactory
+    }
 
     /**
      * Detects handler annotations on beans that belong to the starter's base package.
      */
     @Throws(BeansException::class)
     override fun postProcessAfterInitialization(bean: Any, beanName: String): Any {
+        if (isInfrastructureBean(beanName)) {
+            logger.trace { "Skipping infrastructure bean '$beanName' while scanning for Redis stream handlers" }
+            return bean
+        }
+
         val targetClass = AopUtils.getTargetClass(bean)
         val kClass = targetClass.kotlin
+        val functions = try {
+            kClass.declaredMemberFunctions
+        } catch (ex: Throwable) {
+            if (ex is ClassNotFoundException || ex is NoClassDefFoundError) {
+                logger.debug(ex) {
+                    "Skipping bean '$beanName' while scanning for Redis stream handlers: ${ex.message}"
+                }
+                return bean
+            }
+            throw ex
+        }
 
-        kClass.declaredMemberFunctions.forEach { fn ->
+        functions.forEach { fn ->
             val ann = fn.findAnnotation<RedisStreamHandler>() ?: return@forEach
 
             val param = fn.parameters.getOrNull(1)
@@ -172,6 +196,21 @@ class RedisStreamHandlerRegistrar(
 
         container.start()
         logger.debug { "Redis stream listener container started with ${handlers.size} handlers" }
+    }
+
+    private fun isInfrastructureBean(beanName: String): Boolean {
+        val beanFactory = this.beanFactory ?: return false
+
+        return runCatching {
+            if (beanFactory.containsBeanDefinition(beanName)) {
+                beanFactory.getBeanDefinition(beanName).role == BeanDefinition.ROLE_INFRASTRUCTURE
+            } else {
+                false
+            }
+        }.getOrElse {
+            logger.trace(it) { "Failed to determine bean role for '$beanName'" }
+            false
+        }
     }
 
     /**

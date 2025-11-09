@@ -13,6 +13,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.config.BeanDefinition
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory
+import org.springframework.beans.factory.support.RootBeanDefinition
 import org.springframework.data.redis.connection.RedisConnection
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.connection.RedisStreamCommands
@@ -82,8 +85,30 @@ class RedisStreamHandlerRegistrarTest {
         verify(exactly = 0) { streamCommands.xGroupCreate(any(), any<String>(), any(), any()) }
     }
 
+    @Test
+    fun `skips infrastructure beans when scanning`() {
+        val beanFactory = mockk<ConfigurableListableBeanFactory>()
+        val beanDefinition = RootBeanDefinition().apply { role = BeanDefinition.ROLE_INFRASTRUCTURE }
+        every { beanFactory.containsBeanDefinition("exclusiveHandler") } returns true
+        every { beanFactory.getBeanDefinition("exclusiveHandler") } returns beanDefinition
+
+        val registrar = registrar()
+        registrar.setBeanFactory(beanFactory)
+
+        registrar.postProcessAfterInitialization(ExclusiveHandler(), "exclusiveHandler")
+
+        assertEquals(0, registrar.handlerCount())
+    }
+
     private fun registrar() =
         RedisStreamHandlerRegistrar(container, mapper, scope, connectionFactory)
+
+    private fun RedisStreamHandlerRegistrar.handlerCount(): Int {
+        val field = javaClass.getDeclaredField("handlers")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        return (field.get(this) as MutableList<Any>).size
+    }
 
     data class TestEvent(val id: String)
 

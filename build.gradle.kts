@@ -12,7 +12,7 @@ plugins {
     id("signing")
 }
 
-val starterVersion = "0.0.3"
+val starterVersion = "0.0.4"
 val artifact = "redisson-streams-starter"
 val starterGroup = "art.picsell.starter"
 
